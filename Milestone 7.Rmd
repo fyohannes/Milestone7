@@ -1,0 +1,219 @@
+---
+title: "Milestone7"
+author: "Feven Yohannes"
+date: "April 17, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(readr)
+library(dplyr)
+library(lmtest)
+library(tinytex)
+
+#Need this to run coeftest
+
+library(sandwich)
+
+#Need this to run vcovHc
+
+library(tidybayes)
+
+#Need this to make my graphic for my extension 
+
+library(rstanarm)
+library(stargazer)
+library(tidyverse)
+
+#Reading in the data 
+
+budget <- read_csv("dataverse_files/replication_file_jop/data/budget_results.csv", col_types = cols(
+  .default = col_double(),
+  kab.x = col_character(),
+  kab.y = col_character()
+))
+
+constituency_data  <- read_csv("dataverse_files/replication_file_jop/data/pub_opinion_results.csv",
+                           col_types = cols(
+  .default = col_double(),
+  dapil = col_character()
+                           ))
+
+candidate_data  <- read_csv("dataverse_files/replication_file_jop/data/candidate_2019_data.csv",
+                           col_types = cols(
+  .default = col_double(),
+  dapil = col_character()
+                           ))
+
+center_data  <- read_csv("dataverse_files/replication_file_jop/data/center_data.csv",
+                           col_types = cols(
+  .default = col_double(),
+  dapil = col_character()
+                           ))
+
+gender_data  <- read_csv("dataverse_files/replication_file_jop/data/dapil_gender_composition.csv",
+                           col_types = cols(
+  .default = col_double(),
+  dapil = col_character()
+                           ))
+
+election_data  <- read_csv("dataverse_files/replication_file_jop/data/election_characteristics_balance.csv",
+                           col_types = cols(
+  .default = col_double(),
+  dapil = col_character()
+                           ))
+
+gender_estimation_data  <- read_csv("dataverse_files/replication_file_jop/data/estimation_sample_dapils_w_gender.csv",
+                           col_types = cols(
+  .default = col_double(),
+  dapil = col_character()
+                           ))
+  
+laws_data  <- read_csv("dataverse_files/replication_file_jop/data/laws_dprd_2009.csv",
+                           col_types = cols(
+  .default = col_double(),
+  dapil = col_character()
+                           ))
+
+public_opinion_individual_data  <- read_csv("dataverse_files/replication_file_jop/data/pub_opinion_results_individual.csv",
+                           col_types = cols(
+  .default = col_double(),
+  dapil = col_character()
+                           ))
+```
+
+#Extension: 
+
+```{r,results="asis",warning=FALSE, Extension for the first table }
+
+#Instead of running the regression by using lm, I will use stan_lm
+#Adding refresh=0 so it doesn't run multiple times
+#Using prior=NULL because we have no prior since we are transforming te orginial lm regressions into a Bayesian model
+
+mod_fem1_new <- stan_lm(v744a_f2012 ~ woman_win, data = constituency_data, prior= NULL, refresh=0)
+mod_fem2_new <- stan_lm(v744b_f2012 ~ woman_win, data = constituency_data, prior= NULL,refresh=0)
+mod_fem3_new <- stan_lm(v744c_f2012 ~ woman_win, data = constituency_data, prior= NULL,refresh=0)
+mod_fem4_new <- stan_lm(v744d_f2012 ~ woman_win, data = constituency_data, prior= NULL,refresh=0)
+mod_fem5_new <- stan_lm(v744e_f2012 ~ woman_win, data = constituency_data,prior= NULL,refresh=0)
+
+#This added an index of the prior information onto the table
+
+mod_fem7_new <- stan_lm(add_index_f2012 ~ woman_win, data = constituency_data, prior= NULL,)
+
+#Nobs computes the number of non-missing observations
+
+observations_new <- c(nobs(mod_fem1_new),nobs(mod_fem2_new),nobs(mod_fem3_new),nobs(mod_fem4_new),nobs(mod_fem5_new),nobs(mod_fem7_new))
+
+#Coefests is an inference for estimated coefficents on the models
+#I need different names for the coeftests and the regressions bc my graphics will just be looking at bayesian regressions
+
+mod_fem1_new_coef <- coeftest(mod_fem1_new)
+mod_fem2_new_coef <- coeftest(mod_fem2_new)
+mod_fem3_new_coef <- coeftest(mod_fem3_new)
+mod_fem4_new_coef<- coeftest(mod_fem4_new)
+mod_fem5_new_coef <- coeftest(mod_fem5_new)
+mod_fem7_new_coef <- coeftest(mod_fem7_new)
+
+#Made the models with their respective coefficents into a table 
+
+table_new <- list(mod_fem1_new, mod_fem2_new, mod_fem3_new, mod_fem4_new, mod_fem5_new, mod_fem7_new)
+
+note_text <- paste("Beta coefficients from OLS regression. Standard errors were calculated using the huber-white (HC0) correction. The outcomes are drawn from a battery of questions that asked respondents if it was acceptable to beat one's wife if she: (1) goes out without telling her husband; (2) neglects her children; (3) argues with her husband; (4) refuses sex; (5) burns the food. The index is an additive measure.")
+
+#Used stargazer to make the table
+
+table_new = stargazer(table_new,
+                  title = "Effect of Female Incumbency on Female Attitudes Towards IPV", 
+                  label = 'tab:table_female',
+                  model.names = F,
+                  model.numbers = T,
+                  #column.separate = c(6),
+                  column.labels = c("Goes out", "Neglects children", "Argues", "Refuses sex", "Burns food", "Index"),
+                  
+                  multicolumn = T,
+                  dep.var.labels = c("Is it okay to beat one's wife if she:"), 
+                  add.lines = list(c("Observations", observations),
+                                   c('Bandwidth', rep(c('1\\%'), 6))),
+                  covariate.labels = c("Female Incumbency"),
+                  star.cutoffs = c(0.05, 0.01),
+                  #float.env = 'sidewaystable',
+                  keep.stat = c("n"),
+                  notes = NULL,
+                  notes.align = 'l')
+
+#I used overlap to put in the latec code to see the output
+#ppcheck >>> shows difference between the  model data... how well the bayesian regression fits with the data that is provided 
+#dark line is the data, light line is the bayesian model
+
+model1_check <- pp_check(mod_fem1_new,"dens_overlay") +
+  labs(title = "Blah")
+model2_check <- pp_check(mod_fem2_new,"dens_overlay") +
+  labs(title = "Blah")
+model3_check <- pp_check(mod_fem3_new,"dens_overlay") +
+  labs(title = "Blah")
+model4_check <- pp_check(mod_fem4_new,"dens_overlay") +
+  labs(title = "Blah")
+model5_check <- pp_check(mod_fem5_new,"dens_overlay") +
+  labs(title = "Blah")
+
+#This graph just looks at the index showing overall IPV attitude changes
+
+model7_check <- pp_check(mod_fem7_new,"dens_overlay") +
+  labs(title = "Blah")
+
+```
+
+
+```{r, making my graphic,results="asis",warning=FALSE, Extension for the second table }
+
+#These lines of code do the same thing that the previous table did, however, rather than predicting female respondent results, it predicts male respondent results. 
+
+#Instead of running the regression by using lm, I will use stan_lm
+#Adding refresh=0 so it doesn't run multiple times
+#Using prior=NULL because we have no prior since we are transforming te orginial lm regressions into a Bayesian model
+
+mod_mal1_new <- stan_lm(v744a_m2012 ~ woman_win, prior= NULL, data = constituency_data,refresh=0)
+mod_mal2_new <- stan_lm(v744b_m2012 ~ woman_win, prior= NULL, data = constituency_data,refresh=0)
+mod_mal3_new <- stan_lm(v744c_m2012 ~ woman_win, prior= NULL, data = constituency_data,refresh=0)
+mod_mal4_new <- stan_lm(v744d_m2012 ~ woman_win, prior= NULL, data = constituency_data,refresh=0)
+mod_mal5_new <- stan_lm(v744e_m2012 ~ woman_win,  prior= NULL,data = constituency_data,refresh=0)
+mod_mal7_new <- stan_lm(add_index_m2012 ~ woman_win,  prior= NULL,data = constituency_data,refresh=0)
+
+observations <- c(nobs(mod_mal1_new),nobs(mod_mal2_new),nobs(mod_mal3_new),nobs(mod_mal4_new),nobs(mod_mal5_new),nobs(mod_mal7_new))
+
+#The code below takes the coeftest of the models. I got rid of the original code that included covariance bc the covariance isn't present when running stan_lm, althogh it is in the original code when we ran stan_lm
+
+mod_mal1_coef <- coeftest(mod_mal1_new)
+mod_mal2_coef <- coeftest(mod_mal2_new)
+mod_mal3_coef <- coeftest(mod_mal3_new)
+mod_mal4_coef <- coeftest(mod_mal4_new)
+mod_mal5_coef <- coeftest(mod_mal5_new)
+mod_mal7_coef <- coeftest(mod_mal7_new)
+
+table_new_male <- list(mod_mal1_new, mod_mal2_new, mod_mal3_new, mod_mal4_new, mod_mal5_new, mod_mal7_new)
+
+note_text <- paste("Beta coefficients from OLS regression. Standard errors were calculated using the huber-white (HC0) correction. The outcomes are drawn from a battery of questions that asked respondents if it was acceptable to beat one’s wife if she: (1) goes out without telling her husband; (2) neglects her children; (3) argues with her husband; (4) refuses sex; (5) burns the food. The index is an additive measure.")
+
+table_new_male = stargazer(table_new_male,
+                  title = "Effect of Female Incumbency on Male Attitudes Towards IPV",
+                  label = 'tab:table_male',
+                  model.names = F,
+                  model.numbers = T,
+                  #column.separate = c(6),
+                  column.labels = c("Goes out", "Neglects children", "Argues", "Refuses sex", "Burns food", "Index"),
+                  
+                  multicolumn = T,
+                  dep.var.labels = c("Is it okay to beat one's wife if she:"), 
+                  add.lines = list(c("Observations", observations),
+                                   c('Bandwidth', rep(c('1\\%'), 6))),
+                  covariate.labels = c("Female Incumbency"),
+                  star.cutoffs = c(0.05, 0.01),
+                  #float.env = 'sidewaystable',
+                  keep.stat = c("n"),
+                  notes = NULL,
+                  notes.align = 'l')
+
+```
+
